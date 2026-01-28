@@ -112,6 +112,11 @@ body {
   animation: pulse-red 2s ease-in-out infinite;
 }
 
+.performance-badge-neutral {
+  background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+  animation: pulse-indigo 2s ease-in-out infinite;
+}
+
 @keyframes pulse-subtle {
   0%, 100% {
     box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
@@ -127,6 +132,15 @@ body {
   }
   50% {
     box-shadow: 0 0 40px rgba(239, 68, 68, 0.7);
+  }
+}
+
+@keyframes pulse-indigo {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(99, 102, 241, 0.7);
   }
 }
 

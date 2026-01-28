@@ -266,13 +266,22 @@ function App() {
           {/* Performance Gain Banner */}
           {result.comparison.waio_framework_detected && (
             <div className="max-w-4xl mx-auto mb-8 text-center">
-              {result.comparison.cognitive_speedup >= 1.0 ? (
+              {result.comparison.performance_gain_percent > 0 ? (
                 <div className="inline-block performance-badge px-8 py-4 rounded-2xl">
                   <span className="text-3xl lg:text-5xl font-bold text-white leading-tight">
                     WAIO is {result.comparison.cognitive_speedup.toFixed(1)}x faster
                   </span>
                   <p className="text-emerald-100 mt-1">
                     {result.comparison.performance_gain_percent.toFixed(1)}% reduction in cognitive processing time
+                  </p>
+                </div>
+              ) : result.comparison.performance_gain_percent === 0 ? (
+                <div className="inline-block performance-badge-neutral px-8 py-4 rounded-2xl">
+                  <span className="text-3xl lg:text-5xl font-bold text-white leading-tight">
+                    WAIO-Ready: Direct Mapping
+                  </span>
+                  <p className="text-indigo-100 mt-1">
+                    Semantic structure detected. Optimal clarity for bot extraction.
                   </p>
                 </div>
               ) : (

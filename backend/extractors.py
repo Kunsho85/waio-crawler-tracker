@@ -131,12 +131,17 @@ class WAIOExtractor:
     def __init__(self, heuristic_fallback: HeuristicExtractor):
         self.fallback = heuristic_fallback
     
-    def extract(self, html_content: str, baseline_time: Optional[float] = None) -> Tuple[ExtractionResult, float]:
+    def extract(self, html_content: str, baseline_time: Optional[float] = None, 
+                bot_type: str = "GPTBot", simulation_mode: str = "WAIO Theory") -> Tuple[ExtractionResult, float]:
         """
         Extract content using WAIO Weighted Scoping.
-        Simulates proportional cost savings: Chaque field found via WAIO
+        Simulates proportional cost savings: Each field found via WAIO
         saves ~33% of the heuristic cognitive effort.
+        
+        Now includes Bot Preference Modifiers based on Simulation Mode.
         """
+        from bot_preferences import BotType, SimulationMode, get_scoring_modifier
+        
         timer = MetricTimer()
         result = ExtractionResult()
         result.waio_detected = False
@@ -203,21 +208,53 @@ class WAIOExtractor:
 
         # STEP 2: Cost Simulation (The Benchmark Logic)
         cognitive_overhead = timer.elapsed
+        
+        # Collect detected attributes for scoring modifier
+        # We need to map Found Attributes -> Schema Types (simple heuristic map)
+        found_attrs_map = {}
+        if result.waio_detected:
+            # Re-parse to get all data-ai attributes for preference matching
+            try:
+                tree = lxml_html.fromstring(html_content)
+                all_ai = tree.xpath('//*[@*[starts-with(name(), "data-ai-")]]')
+                for elem in all_ai:
+                    for k, v in elem.attrib.items():
+                        if k.startswith('data-ai-'): found_attrs_map[v] = k
+            except: pass
+            
         found_via_waio = sum(1 for s in result.sources.values() if s == 'waio')
         
         if baseline_time is not None:
             if found_via_waio == 0:
-                # OPTION A: No WAIO benefit. Match baseline exactly to avoid "scan penalty".
+                # OPTION A: No WAIO benefit. Match baseline exactly.
                 simulated_time = baseline_time
             else:
-                # OPTION B: Proportional benefit.
-                # If we skipped 2 out of 3 heuristic fields, we save 66% of baseline.
-                # Total = (Heuristic cost of unfound fields) + (Scan overhead)
-                heuristic_multiplier = (3 - found_via_waio) / 3.0
-                simulated_time = (baseline_time * heuristic_multiplier) + cognitive_overhead
+                # OPTION B: Proportional benefit + Bot Preference Modifier.
+                
+                # 1. Base Multiplier (Quantity of fields found)
+                # Even if we find everything, there's a small cognitive floor (5%)
+                # that represents the work of "confirming" the data.
+                thinking_skipped_ratio = found_via_waio / 3.0
+                remaining_effort_ratio = max(0.05, 1.0 - (thinking_skipped_ratio * 0.95))
+                
+                # 2. Score Modifier (Quality/Preference of fields found)
+                # Does this bot LIKE what we found? 
+                # A modifier > 1.0 means "Speedup". 
+                try:
+                    modifier = get_scoring_modifier(
+                        BotType(bot_type), 
+                        SimulationMode(simulation_mode), 
+                        found_attributes=found_attrs_map
+                    )
+                    # Speedup reduces the TIME.
+                    remaining_effort_ratio = remaining_effort_ratio / modifier
+                except: 
+                    pass 
+
+                simulated_time = (baseline_time * remaining_effort_ratio) + cognitive_overhead
             
-            # Ensure we don't return unrealistic zero (min 2ms floor)
-            simulated_time = max(0.002, simulated_time)
+            # Ensure we don't return unrealistic zero (min 1ms floor)
+            simulated_time = max(0.001, simulated_time)
             
             # Always get fallback data for missing fields
             if found_via_waio < 3:
@@ -256,3 +293,4 @@ class WAIOExtractor:
 # Singleton instances
 heuristic_extractor = HeuristicExtractor()
 waio_extractor = WAIOExtractor(heuristic_fallback=heuristic_extractor)
+

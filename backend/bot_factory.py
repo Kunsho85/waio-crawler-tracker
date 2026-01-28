@@ -19,6 +19,7 @@ class BotType(str, Enum):
     CLAUDEBOT = "ClaudeBot"
     CHATGPT_USER = "ChatGPT-User"
     GOOGLEBOT = "Googlebot"
+    GOOGLE_EXTENDED = "Google-Extended"
     BINGBOT = "Bingbot"
     PERPLEXITY = "PerplexityBot"
     YOUBOT = "YouBot"
@@ -76,6 +77,16 @@ BOT_CONFIGS: Dict[BotType, BotConfig] = {
     BotType.GOOGLEBOT: BotConfig(
         name="Googlebot",
         user_agent="Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        is_dynamic=False,
+        extra_headers={
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Encoding": "gzip, deflate",
+        },
+        tls_fingerprint="chrome"
+    ),
+    BotType.GOOGLE_EXTENDED: BotConfig(
+        name="Google-Extended",
+        user_agent="Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/W.X.Y.Z Mobile Safari/537.36 (compatible; Google-Extended)",
         is_dynamic=False,
         extra_headers={
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",

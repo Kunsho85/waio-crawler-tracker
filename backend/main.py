@@ -20,6 +20,7 @@ from metrics import ComparisonResult, BenchmarkMetrics
 class BenchmarkRequest(BaseModel):
     url: str
     bot_type: str = "GPTBot"
+    simulation_mode: str = "WAIO Theory"  # Default to WAIO Theory as per preference
 
 
 class BotInfo(BaseModel):
@@ -135,7 +136,12 @@ async def run_benchmark(request: BenchmarkRequest):
         
         # Run WAIO extraction (Algorithm B)
         # We pass heuristic_time as baseline_time to ensure fair calculation if WAIO falls back
-        waio_result, waio_time = waio_extractor.extract(html_content, baseline_time=heuristic_time)
+        waio_result, waio_time = waio_extractor.extract(
+            html_content, 
+            baseline_time=heuristic_time,
+            bot_type=request.bot_type,
+            simulation_mode=request.simulation_mode
+        )
         result.waio_extraction = waio_result
         result.waio_metrics.cognitive_time = waio_time
         

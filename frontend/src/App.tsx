@@ -54,6 +54,7 @@ const API_BASE = import.meta.env.MODE === 'development' ? 'http://localhost:8000
 function App() {
   const [url, setUrl] = useState('');
   const [botType, setBotType] = useState('GPTBot');
+  const [simulationMode, setSimulationMode] = useState('WAIO Theory'); // New state
   const [bots, setBots] = useState<BotInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BenchmarkResult | null>(null);
@@ -68,13 +69,15 @@ function App() {
       .catch(() => {
         // Fallback bots if API not available
         setBots([
-          { id: 'GPTBot', name: 'GPTBot', user_agent: 'GPTBot/1.2', is_dynamic: false, description: 'OpenAI crawler' },
-          { id: 'ClaudeBot', name: 'ClaudeBot', user_agent: 'ClaudeBot/1.0', is_dynamic: false, description: 'Anthropic crawler' },
-          { id: 'ChatGPT-User', name: 'ChatGPT-User', user_agent: 'ChatGPT-User/1.0', is_dynamic: true, description: 'JS-enabled crawler' },
-          { id: 'PerplexityBot', name: 'PerplexityBot', user_agent: 'PerplexityBot/1.0', is_dynamic: false, description: 'Perplexity AI' },
-          { id: 'YouBot', name: 'YouBot', user_agent: 'YouBot/1.0', is_dynamic: false, description: 'You.com search' },
-          { id: 'MetaBot', name: 'MetaBot', user_agent: 'facebookexternalhit/1.1', is_dynamic: false, description: 'Meta crawler' },
-        ]);
+            { id: 'GPTBot', name: 'GPTBot', user_agent: 'GPTBot/1.2', is_dynamic: false, description: 'OpenAI crawler' },
+            { id: 'ClaudeBot', name: 'ClaudeBot', user_agent: 'ClaudeBot/1.0', is_dynamic: false, description: 'Anthropic crawler' },
+            { id: 'ChatGPT-User', name: 'ChatGPT-User', user_agent: 'ChatGPT-User/1.0', is_dynamic: true, description: 'JS-enabled crawler' },
+            { id: 'Googlebot', name: 'Googlebot', user_agent: 'Googlebot/2.1', is_dynamic: false, description: 'Google Search' },
+            { id: 'Google-Extended', name: 'Google-Extended', user_agent: 'Google-Extended', is_dynamic: false, description: 'Google AI' },
+            { id: 'PerplexityBot', name: 'PerplexityBot', user_agent: 'PerplexityBot/1.0', is_dynamic: false, description: 'Perplexity AI' },
+            { id: 'YouBot', name: 'YouBot', user_agent: 'YouBot/1.0', is_dynamic: false, description: 'You.com search' },
+            { id: 'MetaBot', name: 'MetaBot', user_agent: 'facebookexternalhit/1.1', is_dynamic: false, description: 'Meta crawler' },
+          ]);
       });
   }, []);
 
@@ -83,6 +86,7 @@ function App() {
     setResult(null);
     setError(null);
     setBotType('GPTBot');
+    // Keep simulation mode as preference
   };
 
   const runBenchmark = async () => {
@@ -99,7 +103,11 @@ function App() {
       const response = await fetch(`${API_BASE}/api/benchmark`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, bot_type: botType }),
+        body: JSON.stringify({ 
+            url, 
+            bot_type: botType,
+            simulation_mode: simulationMode // Pass selected mode
+        }),
       });
 
       if (!response.ok) {
@@ -131,6 +139,32 @@ function App() {
 
       {/* Input Section */}
       <div className="glass-card max-w-4xl mx-auto p-6 mb-8 animate-slide-up">
+        {/* Simulation Mode Toggle */}
+        <div className="flex justify-center mb-6">
+            <div className="bg-black/40 p-1 rounded-lg border border-gray-700 inline-flex">
+                <button
+                    onClick={() => setSimulationMode('WAIO Theory')}
+                    className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+                        simulationMode === 'WAIO Theory' 
+                        ? 'bg-indigo-600 text-white shadow-lg' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                >
+                    WAIO Theory (Doc V2.1)
+                </button>
+                <button
+                    onClick={() => setSimulationMode('Industry Consensus')}
+                    className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+                        simulationMode === 'Industry Consensus' 
+                        ? 'bg-indigo-600 text-white shadow-lg' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                >
+                    Industry Consensus
+                </button>
+            </div>
+        </div>
+
         <div className="flex flex-col lg:flex-row gap-4">
           {/* URL Input */}
           <div className="flex-1">

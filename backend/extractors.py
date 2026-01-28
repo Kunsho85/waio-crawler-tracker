@@ -122,11 +122,13 @@ class WAIOExtractor:
     This represents the LOW CPU COST of deterministic extraction.
     """
     
-    # Scoring Weights (Version 2.0)
-    SCORE_CRITICAL = 100
+    # Scoring Weights (Version 2.1 - Trust & Flexibility)
+    SCORE_CRITICAL = 120  # Increased from 100
     SCORE_MATCH_DIRECT = 100
+    SCORE_MATCH_DETAIL = 75   # New: Secondary specificity bonus
     SCORE_MATCH_ENTITY = 50
     SCORE_SCOPE_MAIN = 50
+    SCORE_V21_COMPLIANCE = 30 # Bonus for using both type and detail
     
     def __init__(self, heuristic_fallback: HeuristicExtractor):
         self.fallback = heuristic_fallback
@@ -137,8 +139,6 @@ class WAIOExtractor:
         Extract content using WAIO Weighted Scoping.
         Simulates proportional cost savings: Each field found via WAIO
         saves ~33% of the heuristic cognitive effort.
-        
-        Now includes Bot Preference Modifiers based on Simulation Mode.
         """
         from bot_preferences import BotType, SimulationMode, get_scoring_modifier
         
@@ -153,14 +153,15 @@ class WAIOExtractor:
         with timer:
             try:
                 tree = lxml_html.fromstring(html_content)
+                # v2.1: Robust selector for all WAIO attributes
                 all_ai_elements = tree.xpath('//*[@*[starts-with(name(), "data-ai-") or name()="data-importance"]]')
                 
                 if all_ai_elements:
                     result.waio_detected = True
                     
-                    # O(N) Indexing
-                    main_containers = tree.xpath('//main | //article | //*[@data-ai-entity-type="Main"] | //*[@data-ai-intent="article"]')
-                    critical_containers = tree.xpath('//*[@data-importance="critical"]')
+                    # O(N) Indexing - Scoping logic
+                    main_containers = tree.xpath('//main | //article | //*[@data-ai-entity-type="Main"] | //*[@data-ai-entity-type="Section" and (contains(@data-ai-entity-detail, "main") or contains(@data-ai-entity-detail, "hero") or contains(@data-ai-entity-detail, "article"))]')
+                    critical_containers = tree.xpath('//*[@data-importance="critical" or @data-ai-importance="critical"]')
                     
                     main_elements_set = set()
                     for c in main_containers: main_elements_set.update(c.iter())
@@ -171,28 +172,45 @@ class WAIOExtractor:
                         attrs = element.attrib
                         is_in_main = element in main_elements_set
                         base_score = self.SCORE_SCOPE_MAIN if is_in_main else 0
-                        is_critical = attrs.get('data-importance') == 'critical' or element in critical_elements_set
+                        
+                        # v2.1: Support both legacy and new importance names
+                        importance = attrs.get('data-ai-importance') or attrs.get('data-importance')
+                        is_critical = importance == 'critical' or element in critical_elements_set
                         if is_critical: base_score += self.SCORE_CRITICAL
                         
+                        # v2.1 Compliance Bonus: Using both primary and secondary signals
+                        if 'data-ai-entity-type' in attrs and 'data-ai-entity-detail' in attrs:
+                            base_score += self.SCORE_V21_COMPLIANCE
+
                         def get_val(attr_name):
                             v = attrs.get(attr_name)
                             return v.strip() if v and v.strip() else element.text_content().strip()
 
-                        # Logic and Scoring
+                        # --- Scoring Logic for Fields ---
+                        
+                        # TITLE
                         if 'data-ai-title' in attrs:
                             pool['title'].append((get_val('data-ai-title'), base_score + self.SCORE_MATCH_DIRECT, "Direct data-ai-title"))
-                        elif 'data-ai-entity-type' in attrs and 'Title' in attrs['data-ai-entity-type']:
-                            pool['title'].append((get_val('data-ai-entity-type'), base_score + self.SCORE_MATCH_ENTITY, "Entity Type match (Title)"))
+                        elif 'data-ai-entity-type' in attrs and 'Headline' in attrs['data-ai-entity-type']:
+                            pool['title'].append((get_val('data-ai-entity-type'), base_score + self.SCORE_MATCH_ENTITY, "Entity Type match (Headline)"))
+                        elif 'data-ai-entity-detail' in attrs and 'headline' in attrs['data-ai-entity-detail'].lower():
+                            pool['title'].append((get_val('data-ai-entity-detail'), base_score + self.SCORE_MATCH_DETAIL, "Entity Detail match (Headline)"))
                             
+                        # SUMMARY / DESCRIPTION
                         if any(k in attrs for k in ['data-ai-summary', 'data-ai-description']):
                             attr = 'data-ai-summary' if 'data-ai-summary' in attrs else 'data-ai-description'
                             pool['summary'].append((get_val(attr), base_score + self.SCORE_MATCH_DIRECT, f"Direct {attr}"))
+                        elif 'data-ai-entity-detail' in attrs and any(x in attrs['data-ai-entity-detail'].lower() for x in ['summary', 'description']):
+                            pool['summary'].append((get_val('data-ai-entity-detail'), base_score + self.SCORE_MATCH_DETAIL, "Entity Detail match (Summary/Desc)"))
                         elif 'data-ai-entity-type' in attrs and ('Summary' in attrs['data-ai-entity-type'] or 'Description' in attrs['data-ai-entity-type']):
                             pool['summary'].append((get_val('data-ai-entity-type'), base_score + self.SCORE_MATCH_ENTITY, "Entity Type match (Summary/Desc)"))
 
+                        # MAIN CONTENT
                         if any(k in attrs for k in ['data-ai-content', 'data-ai-main', 'data-ai-article']):
                             attr = next(k for k in ['data-ai-content', 'data-ai-main', 'data-ai-article'] if k in attrs)
                             pool['main_content'].append((get_val(attr), base_score + self.SCORE_MATCH_DIRECT, f"Direct {attr}"))
+                        elif 'data-ai-entity-detail' in attrs and any(x in attrs['data-ai-entity-detail'].lower() for x in ['main', 'article', 'content', 'hero']):
+                            pool['main_content'].append((get_val('data-ai-entity-detail'), base_score + self.SCORE_MATCH_DETAIL, "Entity Detail match (Main/Article)"))
                         elif 'data-ai-entity-type' in attrs and ('Article' in attrs['data-ai-entity-type'] or 'Main' in attrs['data-ai-entity-type'] or 'Content' in attrs['data-ai-entity-type']):
                             pool['main_content'].append((get_val('data-ai-entity-type'), base_score + self.SCORE_MATCH_ENTITY, "Entity Type match (Article/Main)"))
 
